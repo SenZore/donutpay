@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DonutPay — Beli Donut DonutSMP</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍩</text></svg>">
+<style>
+  :root { color-scheme: dark;
+    --bg:#09090b; --card:#101013; --card2:#18181c; --line:#27272a; --txt:#fafafa; --dim:#a1a1aa;
+    --acc:#f59e0b; --acc-hover:#fbbf24; --ok:#22c55e; --err:#ef4444; --radius:10px;
+  }
+  * { box-sizing:border-box; margin:0 }
+  body { font-family:ui-sans-serif,system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--txt); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px }
+  .wrap { width:100%; max-width:400px }
+  .brand { text-align:center; margin-bottom:24px }
+  .brand .logo { font-size:34px }
+  .brand h1 { font-size:22px; font-weight:700; letter-spacing:-.02em; margin-top:6px }
+  .brand p { color:var(--dim); font-size:13px; margin-top:4px }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:24px; box-shadow:0 8px 30px rgba(0,0,0,.4) }
+  .field { margin-bottom:14px }
+  label { display:block; font-size:12.5px; font-weight:500; color:var(--dim); margin-bottom:6px }
+  input { width:100%; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; color:var(--txt); font-size:14px; outline:none; transition:border-color .15s }
+  input:focus { border-color:var(--acc); box-shadow:0 0 0 3px rgba(245,158,11,.12) }
+  .total { display:flex; justify-content:space-between; align-items:baseline; padding:12px 14px; background:var(--card2); border:1px solid var(--line); border-radius:8px; margin:16px 0 4px }
+  .total span { font-size:13px; color:var(--dim) }
+  .total b { font-size:19px; font-variant-numeric:tabular-nums }
+  .btn { width:100%; background:var(--acc); color:#0c0a04; font-weight:600; font-size:14px; border:0; border-radius:8px; padding:12px; cursor:pointer; margin-top:14px; transition:background .15s }
+  .btn:hover:not(:disabled) { background:var(--acc-hover) }
+  .btn:disabled { opacity:.45; cursor:default }
+  .btn.ghost { background:transparent; color:var(--dim); border:1px solid var(--line) }
+  .btn.ghost:hover:not(:disabled) { color:var(--txt); border-color:var(--dim); background:transparent }
+  .msg { margin-top:12px; font-size:12.5px; min-height:16px; color:var(--err) }
+  .qrbox { text-align:center }
+  .qrbox img { width:260px; height:260px; background:#fff; border-radius:10px; padding:10px; margin:14px 0 4px }
+  .status { display:inline-flex; align-items:center; gap:7px; font-size:13.5px; margin-top:10px }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--acc); animation:pulse 1.2s infinite }
+  @keyframes pulse { 50% { opacity:.25 } }
+  .count { color:var(--dim); font-size:12px; margin-top:4px; font-variant-numeric:tabular-nums }
+  .done-ic { width:56px; height:56px; border-radius:50%; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.4); color:var(--ok); font-size:26px; display:flex; align-items:center; justify-content:center; margin:0 auto 14px }
+  .footer { text-align:center; color:var(--dim); font-size:11.5px; margin-top:18px }
+  .stock { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--dim); background:var(--card2); border:1px solid var(--line); padding:5px 10px; border-radius:99px; margin-top:10px }
+  .stock b { color:var(--txt) }
+  .hidden { display:none }
+  a { color:var(--dim) }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">
+    <div class="logo">🍩</div>
+    <h1>DonutPay</h1>
+    <p>Beli donut DonutSMP · bayar QRIS · kirim otomatis</p>
+    <div id="stockchip" class="stock hidden">Stok: <b id="stockval">—</b></div>
+  </div>
+
+  <div class="card" id="step1">
+    <div class="field">
+      <label for="user">Username Minecraft</label>
+      <input id="user" placeholder="contoh: oSenz_" maxlength="16" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="field">
+      <label for="amt">Jumlah (juta donut)</label>
+      <input id="amt" type="number" min="1" max="1000" step="1" value="5">
+    </div>
+    <div class="total"><span>Total bayar</span><b id="total">—</b></div>
+    <button class="btn" id="buy">Buat Order →</button>
+    <p class="msg" id="msg1"></p>
+  </div>
+
+  <div class="card hidden qrbox" id="step2">
+    <h2 style="font-size:17px">Scan QRIS</h2>
+    <p style="color:var(--dim);font-size:12.5px;margin-top:4px" id="qrinfo"></p>
+    <img id="qrimg" alt="QRIS code">
+    <p class="status"><span class="dot"></span><span id="statustxt">Menunggu pembayaran…</span></p>
+    <p class="count" id="countdown"></p>
+    <button class="btn ghost" id="cancel">Batalkan Order</button>
+    <p class="msg" id="msg2"></p>
+  </div>
+
+  <div class="card hidden qrbox" id="step3">
+    <div class="done-ic">✓</div>
+    <h2 style="font-size:17px">Pembayaran Diterima</h2>
+    <p style="color:var(--dim);font-size:13px;margin-top:6px" id="doneinfo"></p>
+    <button class="btn ghost" id="again">Bikin Order Lagi</button>
+  </div>
+
+  <p class="footer">Butuh bantuan? <a href="https://wa.me/628315348868" target="_blank" rel="noopener">WhatsApp support</a></p>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "name": "donutpay",
+  "version": "1.0.0",
+  "description": "Sell in-game currency for a Minecraft server with Pakasir QRIS and a mineflayer delivery bot.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "login": "node src/login.js",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^12.2.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "mineflayer": "^4.25.0",
+    "qrcode": "^1.5.4"
+  }
+}
