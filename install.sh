@@ -2,26 +2,33 @@
 # donutpay AIO installer. Interactive: tanya semua yang dibutuhkan, verifikasi,
 # lalu install. Support Ubuntu/Debian, Fedora/RHEL, Arch, Alpine.
 set -euo pipefail
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 
 # ---------- helpers ----------
 say()  { printf '\n\033[1;33m== %s\033[0m\n' "$*"; }
 ok()   { printf '\033[0;32m   ✓ %s\033[0m\n' "$*"; }
 warn() { printf '\033[0;33m   ! %s\033[0m\n' "$*"; }
 die()  { printf '\033[0;31m   ✗ %s\033[0m\n' "$*" >&2; exit 1; }
-ask()  { # ask VAR "prompt" [default]
-  local var="$1" prompt="$2" def="${3:-}"
-  local val
-  if [ -n "$def" ]; then
-    read -rp "   $prompt [$def]: " val || true
+ask()  { # ask VAR "prompt" [default] — passing a 3rd arg (even "") means blank is allowed
+  local var="$1" prompt="$2" val
+  if [ $# -ge 3 ]; then
+    local def="$3"
+    if [ -n "$def" ]; then read -rp "   $prompt [$def]: " val || true
+    else read -rp "   $prompt (boleh kosong): " val || true; fi
     val="${val:-$def}"
   else
-    while [ -z "${val:-}" ]; do read -rp "   $prompt: " val || true; done
+    while [ -z "${val:-}" ]; do
+      read -rp "   $prompt: " val || die "input habis (EOF) — jawaban belum lengkap"
+    done
   fi
   printf -v "$var" '%s' "$val"
 }
 ask_secret() { # ask_secret VAR "prompt"
   local var="$1" prompt="$2" val
-  while [ -z "${val:-}" ]; do read -rsp "   $prompt: " val; echo; done
+  while [ -z "${val:-}" ]; do
+    read -rsp "   $prompt: " val || die "input habis (EOF) — jawaban belum lengkap"
+    echo
+  done
   printf -v "$var" '%s' "$val"
 }
 ask_yn() { # ask_yn "prompt" default(y/n) -> returns 0/1
@@ -70,6 +77,7 @@ if [ ${#MISSING[@]} -gt 0 ]; then
     *)      die "Install manual dulu: ${MISSING[*]}" ;;
   esac
 fi
+command -v node >/dev/null || die "Node.js tidak terinstall dan auto-install gagal. Install manual Node 20+ dulu."
 [ "$(node -v | cut -d. -f1 | tr -d v)" -ge 20 ] || die "Node.js >= 20 dibutuhkan, punyamu $(node -v)"
 ok "Node $(node -v), npm $(npm -v), semua dependencies terpenuhi"
 
@@ -94,7 +102,11 @@ fi
 say "Payment gateway"
 echo "   1) pakasir  (pakasir.com — QRIS, API sederhana)"
 echo "   2) midtrans (Core API QRIS)"
-ask GW "Pilih [1/2]" "1"
+GW=""
+until [ "$GW" = "1" ] || [ "$GW" = "2" ]; do
+  ask GW "Pilih [1/2]" "1"
+  [ "$GW" = "1" ] || [ "$GW" = "2" ] || warn "pilih 1 atau 2"
+done
 if [ "$GW" = "2" ]; then
   PROVIDER=midtrans
   ask MIDTRANS_SERVER_KEY "Midtrans Server Key (SB-... untuk sandbox)"
@@ -107,6 +119,7 @@ else
   ask PAYMENT_MODE "Mode (sandbox/live)" "sandbox"
   MIDTRANS_SERVER_KEY=""
 fi
+[ "$PAYMENT_MODE" = "sandbox" ] || [ "$PAYMENT_MODE" = "live" ] || die "PAYMENT_MODE harus 'sandbox' atau 'live'"
 
 say "Bot Minecraft"
 ask MC_HOST "Server Minecraft" "donutsmp.net"
@@ -118,11 +131,28 @@ say "Admin panel"
 ask ADMIN_USER "Username admin" "admin"
 ask_secret ADMIN_PASSWORD "Password admin"
 
-ask RATE "Harga per 1 juta donut (Rp)" "2000"
-ask PORT "Port app" "3000"
+RATE=""
+until [[ "$RATE" =~ ^[0-9]+$ ]] && [ "$RATE" -gt 0 ]; do
+  ask RATE "Harga per 1 juta donut (Rp)" "2000"
+  [[ "$RATE" =~ ^[0-9]+$ ]] && [ "$RATE" -gt 0 ] || warn "harus angka > 0"
+done
+PORT=""
+until [[ "$PORT" =~ ^[0-9]+$ ]] && [ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ]; do
+  ask PORT "Port app" "3000"
+  [[ "$PORT" =~ ^[0-9]+$ ]] && [ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ] || warn "harus 1-65535"
+done
+TRUST_CF_HEADER=""
+if ask_yn "Shop di belakang Cloudflare (tunnel/proxy)? Header cf-connecting-ip bakal dipercaya buat rate-limit." n; then
+  TRUST_CF_HEADER=1
+else
+  TRUST_CF_HEADER=0
+fi
 
 # ---------- write .env ----------
 say "Tulis .env"
+if [ -f .env ] && ! ask_yn ".env sudah ada, timpa?" n; then
+  warn ".env lama dipertahankan"
+else
 cat > .env <<EOF
 PAYMENT_PROVIDER=$PROVIDER
 PAYMENT_MODE=$PAYMENT_MODE
@@ -139,14 +169,23 @@ ADMIN_USER=$ADMIN_USER
 ADMIN_PASSWORD=$ADMIN_PASSWORD
 RATE=$RATE
 PORT=$PORT
+TRUST_CF_HEADER=$TRUST_CF_HEADER
 EOF
 chmod 600 .env
 ok ".env tersimpan (chmod 600)"
+fi
 
 # ---------- npm ----------
 say "npm install"
 npm install --omit=dev --no-audit --no-fund
-ok "dependencies terinstall"
+# npm 11+ bisa blok install scripts (better-sqlite3 butuh native build). Verifikasi & rebuild kalau perlu.
+if ! node -e "require('better-sqlite3')" 2>/dev/null; then
+  warn "better-sqlite3 native binding belum ke-build, coba rebuild..."
+  npm rebuild better-sqlite3 || npm approve-scripts better-sqlite3 2>/dev/null && npm rebuild better-sqlite3 || true
+  node -e "require('better-sqlite3')" || die "better-sqlite3 gagal di-build. Install build tools (gcc, make, python3) lalu ulangi: npm rebuild better-sqlite3"
+fi
+node -e "require('./src/db')" || die "gagal load db module"
+ok "dependencies terinstall & terverifikasi (better-sqlite3 OK)"
 
 # ---------- ssh key ----------
 if ask_yn "Generate SSH key (buat deploy/git)?" n; then
