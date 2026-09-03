@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DonutPay — Beli Donut DonutSMP</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍩</text></svg>">
+<title>DonutPay</title>
+<link id="favicon" rel="icon" href="data:,">
 <style>
   :root { color-scheme: dark;
     --bg:#09090b; --card:#101013; --card2:#18181c; --line:#27272a; --txt:#fafafa; --dim:#a1a1aa;
@@ -14,7 +14,8 @@
   body { font-family:ui-sans-serif,system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--txt); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px }
   .wrap { width:100%; max-width:400px }
   .brand { text-align:center; margin-bottom:24px }
-  .brand .logo { font-size:34px }
+  .brand .logo { font-size:34px; max-height:44px }
+  .brand .logo img { width:44px; height:44px; object-fit:contain; border-radius:8px }
   .brand h1 { font-size:22px; font-weight:700; letter-spacing:-.02em; margin-top:6px }
   .brand p { color:var(--dim); font-size:13px; margin-top:4px }
   .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:24px; box-shadow:0 8px 30px rgba(0,0,0,.4) }
@@ -48,9 +49,9 @@
 <body>
 <div class="wrap">
   <div class="brand">
-    <div class="logo">🍩</div>
-    <h1>DonutPay</h1>
-    <p>Beli donut DonutSMP · bayar QRIS · kirim otomatis</p>
+    <div class="logo hidden" id="brandlogo"></div>
+    <h1 id="brandname">DonutPay</h1>
+    <p id="brandtagline">Beli donut DonutSMP · bayar QRIS · kirim otomatis</p>
     <div id="stockchip" class="stock hidden">Stok: <b id="stockval">—</b></div>
   </div>
 

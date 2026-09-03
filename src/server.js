@@ -15,6 +15,8 @@ const env = process.env
 const payment = loadProvider(env)
 
 const app = express()
+// Branding POST bawa data URL gambar (bisa >64kb) → limit lebih besar khusus route itu.
+app.use('/admin/branding', express.json({ limit: '600kb' }))
 app.use(express.json({ limit: '64kb' }))
 app.use(express.static(path.join(__dirname, '..', 'public')))
 app.set('etag', false)
@@ -52,6 +54,16 @@ function newOrderId() {
 }
 
 const currentRate = () => Number(db.getCfg('rate', RATE))
+
+// Branding publik: nama toko, tagline, favicon & icon (data URL, '' = belum diset).
+app.get('/api/branding', (req, res) => {
+  res.json({
+    name: db.getCfg('brand_name', 'DonutPay'),
+    tagline: db.getCfg('brand_tagline', ''),
+    favicon: db.getCfg('brand_favicon', ''),
+    icon: db.getCfg('brand_icon', ''),
+  })
+})
 
 app.get('/api/config', async (req, res) => {
   let stock = null

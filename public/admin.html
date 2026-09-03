@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DonutPay Admin</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍩</text></svg>">
+<title>Admin</title>
+<link id="favicon" rel="icon" href="data:,">
 <style>
   :root { color-scheme: dark;
     --bg:#09090b; --card:#101013; --card2:#18181c; --line:#27272a; --txt:#fafafa; --dim:#a1a1aa;
@@ -64,8 +64,7 @@
 <div class="center" id="loginview">
   <div class="card" style="width:100%;max-width:340px">
     <div style="text-align:center;margin-bottom:18px">
-      <div style="font-size:30px">🍩</div>
-      <h1 style="font-size:17px;margin-top:4px">DonutPay Admin</h1>
+      <h1 style="font-size:17px;margin-top:4px">Admin Panel</h1>
     </div>
     <label>Username</label>
     <input id="luser" autocomplete="username">
@@ -79,8 +78,7 @@
 <!-- DASHBOARD -->
 <div id="dashview" class="hidden">
   <div class="topbar">
-    <span style="font-size:18px">🍩</span>
-    <h1>DonutPay Admin</h1>
+    <h1><span id="adminbrandname">DonutPay</span> Admin</h1>
     <span class="badge" id="provbadge">—</span>
     <span class="badge" id="botbadge">—</span>
     <div class="spacer"></div>
@@ -97,6 +95,7 @@
       <button class="tab" data-tab="manual">Order Manual (Gratis)</button>
       <button class="tab" data-tab="logs">Logs</button>
       <button class="tab" data-tab="settings">Settings</button>
+      <button class="tab" data-tab="branding">Tampilan</button>
     </div>
 
     <div id="tab-orders" class="card" style="padding:8px 0;overflow-x:auto">
@@ -126,6 +125,25 @@
       </label>
       <button class="btn" style="margin-top:18px" id="ssave">Simpan</button>
       <p class="msg" id="smsg"></p>
+    </div>
+
+    <div id="tab-branding" class="card hidden" style="max-width:460px">
+      <p class="muted">Nama, tagline, favicon (tab browser), dan icon (logo di landing). Emoji bawaan hilang — kalau icon dikosongkan, hanya teks nama yang tampil.</p>
+      <label>Nama Toko</label>
+      <input id="bname" maxlength="60" placeholder="DonutPay">
+      <label>Tagline (subjudul di bawah nama)</label>
+      <input id="btagline" maxlength="120" placeholder="Beli donut DonutSMP · bayar QRIS">
+      <label>Favicon (icon tab browser — png/jpg/svg, otomatis di-resize)</label>
+      <input id="bfavicon" type="file" accept="image/png,image/jpeg,image/svg+xml">
+      <div style="margin-top:8px" id="bfaviconprev"></div>
+      <label>Icon Toko (logo besar di landing)</label>
+      <input id="bicon" type="file" accept="image/png,image/jpeg,image/svg+xml">
+      <div style="margin-top:8px" id="biconprev"></div>
+      <div class="row" style="margin-top:18px">
+        <button class="btn" id="bsave">Simpan Tampilan</button>
+        <button class="btn ghost" id="breset">Reset Icon</button>
+      </div>
+      <p class="msg" id="bmsg"></p>
     </div>
   </div>
 </div>

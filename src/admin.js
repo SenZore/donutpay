@@ -1,5 +1,14 @@
-// Admin routes: session login, dashboard data, manual order, stock, settings.
+// Admin routes: session login, dashboard data, manual order, stock, settings, branding.
 const crypto = require('crypto')
+
+// Data URL divalidasi ketat: hanya png/jpeg/svg+xml, max 200KB.
+// Downscaling dilakukan di sisi browser (canvas) sebelum upload.
+const DATA_URL_RE = /^data:image\/(png|jpeg|svg\+xml);base64,[A-Za-z0-9+/=]{1,280000}$/
+const SVG_RE = /^data:image\/svg\+xml;base64,[A-Za-z0-9+/=]{1,20000}$/
+function validImage(v) {
+  if (typeof v !== 'string' || !v) return false
+  return DATA_URL_RE.test(v) || SVG_RE.test(v)
+}
 
 const sessions = new Map() // token -> expiry ms
 const SESSION_TTL = 12 * 60 * 60 * 1000
@@ -113,6 +122,36 @@ module.exports = function adminRoutes(app, { db, bot, donutapi, env, loginRateLi
       db.setCfg('show_stock', show_stock ? '1' : '0')
     }
     res.json({ ok: true })
+  })
+
+  // ---------- branding (nama toko, tagline, favicon, icon) ----------
+  const branding = () => ({
+    name: db.getCfg('brand_name', 'DonutPay'),
+    tagline: db.getCfg('brand_tagline', ''),
+    favicon: db.getCfg('brand_favicon', ''),
+    icon: db.getCfg('brand_icon', ''),
+  })
+
+  app.get('/admin/branding', auth, (req, res) => res.json(branding()))
+
+  app.post('/admin/branding', auth, (req, res) => {
+    const b = req.body || {}
+    const clean = (s, max) => String(s ?? '').trim().slice(0, max)
+    if (b.name !== undefined) {
+      const name = clean(b.name, 60)
+      if (!name) return res.status(400).json({ error: 'nama toko tidak boleh kosong' })
+      db.setCfg('brand_name', name)
+    }
+    if (b.tagline !== undefined) db.setCfg('brand_tagline', clean(b.tagline, 120))
+    for (const [key, field] of [['brand_favicon', 'favicon'], ['brand_icon', 'icon']]) {
+      if (b[field] === undefined) continue
+      const v = b[field]
+      if (v === '' || v === null) { db.setCfg(key, ''); continue } // reset
+      if (!validImage(v)) return res.status(400).json({ error: `${field}: harus data URL png/jpeg/svg, max ~200KB` })
+      db.setCfg(key, v)
+    }
+    db.log('info', 'admin update branding')
+    res.json({ ok: true, branding: branding() })
   })
 
   app.get('/admin/orders.csv', auth, (req, res) => {

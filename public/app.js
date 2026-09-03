@@ -17,7 +17,23 @@ function updateTotal() {
   $('total').textContent = amt >= 1 ? idr(amt * rate) : '—'
 }
 
+async function applyBranding() {
+  try {
+    const b = await api('/api/branding')
+    if (b.name) { document.title = b.name; $('brandname').textContent = b.name }
+    if (b.tagline !== undefined) $('brandtagline').textContent = b.tagline || ''
+    if (b.favicon) $('favicon').href = b.favicon
+    if (b.icon) {
+      const img = document.createElement('img')
+      img.src = b.icon; img.alt = ''
+      $('brandlogo').replaceChildren(img)
+      $('brandlogo').classList.remove('hidden')
+    }
+  } catch { /* branding gagal gak nge-blok UI */ }
+}
+
 async function init() {
+  applyBranding()
   try {
     const cfg = await api('/api/config')
     rate = cfg.rate

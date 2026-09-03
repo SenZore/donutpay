@@ -104,6 +104,60 @@ test('payment provider loader picks the right module', () => {
   assert.equal(load({ PAYMENT_PROVIDER: 'midtrans' }).name, 'midtrans')
 })
 
+test('branding endpoints (default, set, reset)', async () => {
+  const { app } = require('../src/server')
+  const srv = app.listen(0)
+  const base = `http://127.0.0.1:${srv.address().port}`
+  try {
+    // public default
+    let r = await fetch(`${base}/api/branding`)
+    let b = await r.json()
+    assert.equal(b.name, 'DonutPay')
+    assert.equal(b.favicon, '')
+    assert.equal(b.icon, '')
+
+    // login admin
+    r = await fetch(`${base}/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user: 'admin', pass: 'testpass' }) })
+    const { token } = await r.json()
+    const H = { 'Content-Type': 'application/json', 'x-admin-token': token }
+
+    // set valid
+    const png = 'data:image/png;base64,' + Buffer.from('fakepng').toString('base64')
+    r = await fetch(`${base}/admin/branding`, { method: 'POST', headers: H, body: JSON.stringify({ name: 'TokoGw', tagline: 'murah', favicon: png, icon: png }) })
+    assert.equal(r.status, 200)
+    b = (await r.json()).branding
+    assert.equal(b.name, 'TokoGw')
+    assert.equal(b.favicon, png)
+
+    // reject invalid data url
+    r = await fetch(`${base}/admin/branding`, { method: 'POST', headers: H, body: JSON.stringify({ icon: 'data:text/html;base64,PHNjcmlwdD4=' }) })
+    assert.equal(r.status, 400)
+
+    // reject empty name
+    r = await fetch(`${base}/admin/branding`, { method: 'POST', headers: H, body: JSON.stringify({ name: '  ' }) })
+    assert.equal(r.status, 400)
+
+    // reset
+    r = await fetch(`${base}/admin/branding`, { method: 'POST', headers: H, body: JSON.stringify({ favicon: '', icon: '' }) })
+    b = (await r.json()).branding
+    assert.equal(b.favicon, '')
+    assert.equal(b.icon, '')
+    assert.equal(b.name, 'TokoGw')
+
+    // public reflects
+    r = await fetch(`${base}/api/branding`)
+    b = await r.json()
+    assert.equal(b.name, 'TokoGw')
+    assert.equal(b.tagline, 'murah')
+
+    // unauthorized
+    r = await fetch(`${base}/admin/branding`)
+    assert.equal(r.status, 401)
+  } finally {
+    srv.close()
+  }
+})
+
 test('login and bot modules parse cleanly', () => {
   execSync(`node --check ${path.join(__dirname, '..', 'src', 'login.js')}`)
   execSync(`node --check ${path.join(__dirname, '..', 'src', 'bot.js')}`)
