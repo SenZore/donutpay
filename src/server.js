@@ -22,16 +22,30 @@ app.set('etag', false)
 const RATE = Number(env.RATE || 450)
 const ORDER_TTL_MS = 15 * 60 * 1000
 
-const hits = new Map()
-function rateLimit(req, res, next) {
-  const ip = req.headers['cf-connecting-ip'] || req.ip
-  const cutoff = Date.now() - 60_000
-  const list = (hits.get(ip) || []).filter(t => t > cutoff)
-  list.push(Date.now())
-  hits.set(ip, list)
-  if (list.length > 8) return res.status(429).json({ error: 'terlalu sering, coba 1 menit lagi' })
-  next()
+// Only trust cf-connecting-ip when the app actually sits behind Cloudflare
+// (TRUST_CF_HEADER=1 in .env) — otherwise anyone can send a random value for
+// this header on every request and get a fresh rate-limit bucket each time.
+function clientIp(req) {
+  if (env.TRUST_CF_HEADER === '1' && req.headers['cf-connecting-ip']) return req.headers['cf-connecting-ip']
+  return req.ip
 }
+
+function makeRateLimiter({ max, windowMs }) {
+  const hits = new Map()
+  return (req, res, next) => {
+    const ip = clientIp(req)
+    const cutoff = Date.now() - windowMs
+    const list = (hits.get(ip) || []).filter(t => t > cutoff)
+    list.push(Date.now())
+    hits.set(ip, list)
+    if (list.length > max) return res.status(429).json({ error: 'terlalu sering, coba lagi nanti' })
+    next()
+  }
+}
+
+const rateLimit = makeRateLimiter({ max: 8, windowMs: 60_000 })
+// Stricter bucket for admin login to slow down password brute-forcing.
+const loginRateLimit = makeRateLimiter({ max: 5, windowMs: 5 * 60_000 })
 
 function newOrderId() {
   return 'DP' + Date.now().toString(36).toUpperCase() + crypto.randomBytes(2).toString('hex').toUpperCase()
@@ -120,8 +134,12 @@ app.post('/api/order/:id/cancel', async (req, res) => {
 // Tidak ada signature yang bisa dipercaya, jadi selalu re-verify ke gateway.
 app.post('/webhook/:provider', async (req, res) => {
   res.json({ ok: true })
-  const orderId = req.body?.order_id
-  if (!orderId) return
+  const orderId = String(req.body?.order_id || '')
+  // Our own order ids only ever look like DP... or MANUAL-...; anything else
+  // is not a real order and must not be logged verbatim (untrusted input).
+  if (!/^[A-Z0-9-]{3,40}$/.test(orderId)) {
+    return db.log('warn', 'webhook: order_id malformed, ignored')
+  }
   const o = db.getOrder(orderId)
   if (!o) return db.log('warn', `webhook unknown order ${orderId}`)
   await checkPayment(o)
@@ -146,7 +164,7 @@ app.get('/api/stats', (req, res) => {
   res.json({ bot_online: bot.isOnline(), queue: bot.queueSize(), pending: s.pending || 0, uptime: Math.floor(process.uptime()) })
 })
 
-adminRoutes(app, { db, bot, donutapi, env })
+adminRoutes(app, { db, bot, donutapi, env, loginRateLimit })
 
 // Sandbox helper (Pakasir only, blocked di live)
 app.post('/api/dev/simulate', async (req, res) => {

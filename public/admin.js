@@ -2,6 +2,12 @@ const $ = id => document.getElementById(id)
 let token = localStorage.getItem('dp_admin_token') || null
 let refreshTimer = null
 
+// Never trust data going into innerHTML — order.user, order.id, and log
+// messages can contain attacker-controlled text (e.g. webhook order_id).
+const esc = s => String(s).replace(/[&<>"']/g, c => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}[c]))
+
 const headers = () => ({ 'Content-Type': 'application/json', 'x-admin-token': token })
 
 async function api(url, opts = {}) {
@@ -62,18 +68,18 @@ async function loadOverview() {
 async function loadOrders() {
   const rows = await api('/admin/orders')
   $('orderrows').innerHTML = rows.map(o => `<tr>
-    <td style="font-family:monospace;font-size:11px">${o.id}</td>
-    <td>${o.user}</td><td>${o.amt}M</td><td>${o.amount ? idr(o.amount) : '—'}</td>
-    <td><span class="st ${o.status}">${o.status}</span></td>
+    <td style="font-family:monospace;font-size:11px">${esc(o.id)}</td>
+    <td>${esc(o.user)}</td><td>${esc(o.amt)}M</td><td>${o.amount ? idr(o.amount) : '—'}</td>
+    <td><span class="st ${esc(o.status)}">${esc(o.status)}</span></td>
     <td class="muted">${new Date(o.ts).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</td>
-    <td>${o.status === 'paid' ? `<button class="btn ghost sm" onclick="requeue('${o.id}')">requeue</button>` : ''}</td>
+    <td>${o.status === 'paid' ? `<button class="btn ghost sm" onclick="requeue('${esc(o.id)}')">requeue</button>` : ''}</td>
   </tr>`).join('') || '<tr><td colspan="7" class="muted" style="padding:16px">Belum ada order.</td></tr>'
 }
 
 async function loadLogs() {
   const rows = await api('/admin/logs')
   $('logbox').innerHTML = rows.map(l =>
-    `<div class="${l.level}">[${new Date(l.ts).toLocaleTimeString('id-ID')}] ${l.level}: ${l.msg}</div>`).join('')
+    `<div class="${esc(l.level)}">[${new Date(l.ts).toLocaleTimeString('id-ID')}] ${esc(l.level)}: ${esc(l.msg)}</div>`).join('')
   $('logbox').scrollTop = $('logbox').scrollHeight
 }
 
@@ -98,11 +104,18 @@ window.requeue = async id => {
   catch (e) { alert(e.message) }
 }
 
-window.dl = kind => {
-  const a = document.createElement('a')
-  a.href = `/admin/${kind}.csv?token=${token}`
-  a.download = `${kind}.csv`
-  a.click()
+window.dl = async kind => {
+  try {
+    const r = await fetch(`/admin/${kind}.csv`, { headers: headers() })
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    const blob = await r.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${kind}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (e) { alert(e.message) }
 }
 
 $('loginbtn').onclick = login

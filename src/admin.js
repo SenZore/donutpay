@@ -23,15 +23,19 @@ function csv(res, head, rows) {
   res.send(head + rows.join('\n'))
 }
 
-module.exports = function adminRoutes(app, { db, bot, donutapi, env }) {
+module.exports = function adminRoutes(app, { db, bot, donutapi, env, loginRateLimit }) {
   const auth = (req, res, next) =>
     checkSession(req) ? next() : res.status(401).json({ error: 'unauthorized' })
 
-  app.post('/admin/login', (req, res) => {
+  const loginLimiter = loginRateLimit || ((req, res, next) => next())
+
+  app.post('/admin/login', loginLimiter, (req, res) => {
     const { user, pass } = req.body || {}
     if (user === env.ADMIN_USER && pass === env.ADMIN_PASSWORD) {
+      db.log('info', 'admin login ok')
       return res.json({ token: newSession() })
     }
+    db.log('warn', 'admin login gagal')
     res.status(401).json({ error: 'username atau password salah' })
   })
 
